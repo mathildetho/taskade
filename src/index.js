@@ -4,40 +4,33 @@ const dotenv = require('dotenv');
 dotenv.config();
 const { DB_URI, DB_NAME } = process.env;
 
-const books = [
-    {
-      title: 'The Awakening',
-      author: 'Kate Chopin',
-    },
-    {
-      title: 'City of Glasses',
-      author: 'Paul Auster',
-    },
-];
-
 const typeDefs = gql`
-  # Comments in GraphQL strings (such as this one) start with the hash (#) symbol.
+    type User {
+        id: ID!
+        name: String!
+        email: String!
+        avatar: String
+    }
 
-  # This "Book" type defines the queryable fields for every book in our data source.
-  type Book {
-    title: String
-    author: String
-  }
+    type TaskList {
+        id: ID!
+        createdAt: String!
+        title: String!
+        progress: Float!
+        users: [User!]!
+        todos: [Todo!]!
+    }
 
-  # The "Query" type is special: it lists all of the available queries that
-  # clients can execute, along with the return type for each. In this
-  # case, the "books" query returns an array of zero or more Books (defined above).
-  type Query {
-    books: [Book]
-  }
+    type Todo {
+        id: ID!
+        content: String!
+        isCompleted: Boolean!
+        taskList: TaskList!
+    }
 `;
 
 const resolvers = {
-    Query: {
-      books: () => {
-        return books;
-      },
-    },
+
 };
 
 const start = async () => {
