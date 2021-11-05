@@ -55,10 +55,16 @@ const typeDefs = gql`
   type Mutation {
     signUp(input: SignUpInput!): AuthUser!
     signIn(input: SignInInput!): AuthUser!
+
     createTaskList(title: String!): TaskList!
     updateTaskList(id: ID!, title: String!): TaskList!
     deleteTaskList(id: ID!): Boolean!
     addUserToTaskList(taskListId: ID!, userId: ID!): TaskList!
+
+    createTodo(content: String!, taskListId: ID!,): Todo!
+    updateTodo(id: ID!, content: String, isCompleted: Boolean): Todo!
+    deleteTodo(id: ID!): Boolean!
+
   }
 `;
 
@@ -111,6 +117,7 @@ const resolvers = {
         token: getToken(user)
       }
     },
+
     createTaskList: async (_, { title }, { db, user }) => {
       if (!user) throw new Error('Authentication error');
 
@@ -149,6 +156,33 @@ const resolvers = {
       task.userIds.push(ObjectId(userId));
       return task;
     },
+
+    createTodo: async (_, { content, taskListId }, { db, user }) => {
+      if (!user) throw new Error('Authentication error');
+
+      const newTodo = {
+        content,
+        isCompleted: false,
+        taskListId: ObjectId(taskListId)
+      }
+
+      const result = await db.collection('Todo').insertOne(newTodo);
+      const todo = await db.collection('Todo').findOne({ _id: result.insertedId })
+
+      return todo
+    },
+    updateTodo: async (_, data, { db, user }) => {
+      if (!user) throw new Error('Authentication error');
+      
+      const result = await db.collection('Todo').findOneAndUpdate({ _id: ObjectId(data.id) }, { $set: data });
+      return result.value;
+    },
+    deleteTodo: async (_, { id }, { db, user }) => {
+      if (!user) throw new Error('Authentication error');
+
+      await db.collection('Todo').deleteOne({ _id: ObjectId(id) });
+      return true;
+    },
   },
 
   User: {
@@ -156,9 +190,19 @@ const resolvers = {
   },
   TaskList: {
     id: ({ _id, id }) => _id || id,
-    progress: () => 0,
-    users: async ({ userIds }, _, { db }) => Promise.all(userIds.map((userId) => db.collection('Users').findOne({ _id: userId })))
-  }
+    progress: async ({ _id }, _, { db }) => {
+      const todos = await db.collection('Todo').find({ taskListId: ObjectId(_id) }).toArray();
+      const completed = todos.filter((todo) => todo.isCompleted);
+      if (todos.length === 0) return 0;
+      return 100 * (completed.length / todos.length);
+    },
+    users: async ({ userIds }, _, { db }) => Promise.all(userIds.map((userId) => db.collection('Users').findOne({ _id: userId }))),
+    todos: async ({ _id }, _, { db }) => await db.collection('Todo').find({ taskListId: ObjectId(_id) }).toArray()
+  },
+  Todo: {
+    id: ({ _id, id }) => _id || id,
+    taskList: async ({ taskListId }, _, { db }) => await db.collection('Tasks').findOne({ _id: taskListId })
+  },
 };
 
 const start = async () => {
